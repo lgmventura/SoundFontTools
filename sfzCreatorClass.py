@@ -24,6 +24,7 @@ class sample:
     Amp_veltrack       = None
     Cutoff             = None
     Fil_veltrack       = None
+    Volume             = None
     
     # non-opcodes:
     Vel                = None
@@ -77,6 +78,8 @@ class sfz_creator:
             self.SfzStrL.append('cutoff=' + str(sample.Cutoff))
         if sample.Fil_veltrack != None:
             self.SfzStrL.append('fil_veltrack=' + str(sample.Fil_veltrack))
+        if sample.Volume != None:
+            self.SfzStrL.append('volume=' + str(sample.Volume))
             
         self.SfzStrL.append('') # empty line
         
@@ -180,6 +183,8 @@ class sfz_creator:
                 else:
                     self.Samples[iSam].Lokey = currP
                     self.Samples[iSam].Hikey = self.PkcList[::-1][self.PkcList[::-1].index(currP)-1] - 1 # find last occurrence and go back one position (reversed list). Subtract 1 to finish before starting next region, without superposition.
+            elif spreadDirection == 'closest':
+                raise NotImplementedError('To be implemented.')
             
         
     def autoSpreadVelocities(self, spreadDirection): # lower vel, closest vel, higher vel
@@ -198,14 +203,90 @@ class sfz_creator:
            # samples_same_p.tolist.sort(key=sample.Vel)
             currIdx = samples_same_p.tolist().index(currSam)
             if spreadDirection == 'lower':
-                self.Samples[iSam].Lovel = vels[currIdx]
+                self.Samples[iSam].Lovel = vels[currIdx] + 1
                 self.Samples[iSam].Hivel = vels[currIdx+1]
+            elif spreadDirection == 'higher':
+                raise NotImplementedError('To be implemented.')
+            elif spreadDirection == 'closest':
+                raise NotImplementedError('To be implemented.')
                 
         # todo - better approach: run thorough all pitches (0 to 127) and for every sub-region, do an independent spread. Connect them!
         
-    def setForAll(self, prop, val):
+    def setForAll(self, attribute: str, val):
+        """
+        
+
+        Parameters
+        ----------
+        attribute : str
+            attribute to set for all samples. E.g. 'Ampeg_release'
+        val : int OR float
+            value to set for attribute in all samples.
+
+        Returns
+        -------
+        None.
+
+        """
         for iSam in range(len(self.Samples)):
-            setattr(self.Samples[iSam], prop, val)
+            setattr(self.Samples[iSam], attribute, val)
+            
+    def setForAllIf(self, attribute: str, val, comparison_attr: str, comparison_sign: str, comparison_value):
+        """
+        
+
+        Parameters
+        ----------
+        attribute : str
+            attribute to set for all samples that matches the condition.
+            E.g. 'Cutoff'.
+        val : TYPE
+            Value to set for attribute in all samples that matches the
+            condition.
+        comparison_attr : str
+            Attribute whose value is to be checked.
+        comparison_sign : str
+            '==', '!=', '<', '>', '<=' or '>='.
+        comparison_value : TYPE
+            Value to check in the comparison attribute.
+
+        Raises
+        ------
+        AttributeError
+            If comparison_sign is not valid.
+
+        Returns
+        -------
+        None.
+
+        """
+        # Todo: make it more flexible with any possible set of conditions. Like [if a < b and c != d or e == f] -> this will need an interpreter for this. eval, exec?
+        if comparison_sign == '==':
+            for iSam in range(len(self.Samples)):
+                if getattr(self.Samples[iSam], comparison_attr) == comparison_value:
+                    setattr(self.Samples[iSam], attribute, val)
+        elif comparison_sign == '!=':
+            for iSam in range(len(self.Samples)):
+                if getattr(self.Samples[iSam], comparison_attr) != comparison_value:
+                    setattr(self.Samples[iSam], attribute, val)
+        elif comparison_sign == '>=':
+            for iSam in range(len(self.Samples)):
+                if getattr(self.Samples[iSam], comparison_attr) >= comparison_value:
+                    setattr(self.Samples[iSam], attribute, val)
+        elif comparison_sign == '<=':
+            for iSam in range(len(self.Samples)):
+                if getattr(self.Samples[iSam], comparison_attr) <= comparison_value:
+                    setattr(self.Samples[iSam], attribute, val)
+        elif comparison_sign == '>':
+            for iSam in range(len(self.Samples)):
+                if getattr(self.Samples[iSam], comparison_attr) > comparison_value:
+                    setattr(self.Samples[iSam], attribute, val)
+        elif comparison_sign == '<':
+            for iSam in range(len(self.Samples)):
+                if getattr(self.Samples[iSam], comparison_attr) < comparison_value:
+                    setattr(self.Samples[iSam], attribute, val)
+        else:
+            raise AttributeError('Invalid comparison sign: ' + comparison_sign)
         
 # Test (delete all this after testing):
 #fp = '/media/luiz/Volume/Downloads/SoundFonts/SteinwayD274/Samples/Bright'
@@ -213,7 +294,7 @@ fp = '/media/luiz/Volume/Dokumente/Musik/Projekte/SoundFonts/PTQ_SteinwayD_H'
 
 sfz1 = sfz_creator([], '/media/luiz/Volume/Dokumente/Musik/Projekte/SoundFonts/Steinway_D_HB.sfz')
 
-sfz1.VelMap = {'v2': 50, 'v4': 100, 'loud': 127}
+sfz1.VelMap = {'v1': 33, 'v2': 50, 'v3': 75, 'v4': 100, 'v5': 116, 'v6': 127}
 
 #sfz1.getSamplesFromFolder(fp, pmidi = 'C(\d+)')
 #sfz1.getSamplesFromFolder(fp, pitch = '_([A-G]#?\d)_', vel='_([a-z]+)_')
@@ -224,9 +305,22 @@ sfz1.autoSpreadKeys('higher')
 
 sfz1.autoSpreadVelocities('lower')
 
-sfz1.setForAll('Ampeg_release', 0.6)
+sfz1.setForAll('Ampeg_release', 1.0)
 
-sfz1.setForAll('Cutoff', 200)
+#sfz1.setForAll('Cutoff', 200)
+sfz1.setForAllIf('Cutoff', 2000, 'Vel', '==', 33)
+sfz1.setForAllIf('Cutoff', 1400, 'Vel', '==', 50)
+sfz1.setForAllIf('Cutoff', 800, 'Vel', '==', 75)
+sfz1.setForAllIf('Cutoff', 220, 'Vel', '==', 100)
+sfz1.setForAllIf('Cutoff', 160, 'Vel', '==', 116)
+sfz1.setForAllIf('Cutoff', 120, 'Vel', '==', 127)
+
+sfz1.setForAllIf('Volume', 5, 'Vel', '==', 33)
+sfz1.setForAllIf('Volume', 4, 'Vel', '==', 50)
+sfz1.setForAllIf('Volume', 5, 'Vel', '==', 75)
+sfz1.setForAllIf('Volume', 1, 'Vel', '==', 100)
+sfz1.setForAllIf('Volume', 0, 'Vel', '==', 116)
+sfz1.setForAllIf('Volume', -1, 'Vel', '==', 127)
 
 sfz1.setForAll('Fil_veltrack', 8000)
 
