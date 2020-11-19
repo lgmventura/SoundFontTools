@@ -209,14 +209,16 @@ class sfz_creator:
         
 # Test (delete all this after testing):
 #fp = '/media/luiz/Volume/Downloads/SoundFonts/SteinwayD274/Samples/Bright'
-fp = '/media/luiz/Volume/Downloads/SoundFonts/VCSL_github/Struck Idiophones/Glockenspiel'
+fp = '/media/luiz/Volume/Dokumente/Musik/Projekte/SoundFonts/PTQ_SteinwayD_H'
 
-sfz1 = sfz_creator([], '/media/luiz/Volume/Downloads/SoundFonts/sfzPythonTest.sfz')
+sfz1 = sfz_creator([], '/media/luiz/Volume/Dokumente/Musik/Projekte/SoundFonts/Steinway_D_HB.sfz')
 
-sfz1.VelMap = {'soft': 50, 'medium': 90, 'loud': 127}
+sfz1.VelMap = {'v2': 50, 'v4': 100, 'loud': 127}
 
 #sfz1.getSamplesFromFolder(fp, pmidi = 'C(\d+)')
-sfz1.getSamplesFromFolder(fp, pitch = '_([A-G]#?\d)_', vel='_([a-z]+)_')
+#sfz1.getSamplesFromFolder(fp, pitch = '_([A-G]#?\d)_', vel='_([a-z]+)_')
+sfz1.getSamplesFromFolder(fp, pmidi = 'pitch(\d+)', vel='_(v\d)_')
+
 
 sfz1.autoSpreadKeys('higher')
 
