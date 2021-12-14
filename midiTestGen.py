@@ -32,7 +32,7 @@ time     = 1
 pause    = 2    # In beats
 #duration = 1    # In beats
 tempo    = 60   # In BPM
-vel   = 50  # 0-127, as per the MIDI standard
+vel   = 75  # 0-127, as per the MIDI standard
 
 MyMIDI = MIDIFile(1)  # One track, defaults to format 1 (tempo track is created
                       # automatically)

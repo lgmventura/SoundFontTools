@@ -14,8 +14,15 @@ from sfzCreatorClass import sfz_creator
 fp = '/media/luiz/Volume/Dokumente/Musik/Projekte/SoundFonts/PTQ_SteinwayD_H'
 
 sfz1 = sfz_creator([], '/media/luiz/Volume/Dokumente/Musik/Projekte/SoundFonts/Steinway_D_HB.sfz')
+v1 = 40
+v2 = 70
+v3 = 90
+v4 = 108
+v5 = 116
+v6 = 127
 
-sfz1.VelMap = {'v1': 33, 'v2': 50, 'v3': 75, 'v4': 100, 'v5': 116, 'v6': 127}
+
+sfz1.VelMap = {'v1':v1 , 'v2': v2, 'v3': v3, 'v4': v4, 'v5': v5, 'v6': v6}
 
 #sfz1.getSamplesFromFolder(fp, pmidi = 'C(\d+)')
 #sfz1.getSamplesFromFolder(fp, pitch = '_([A-G]#?\d)_', vel='_([a-z]+)_')
@@ -29,22 +36,22 @@ sfz1.autoSpreadVelocities('lower')
 sfz1.setForAll('Ampeg_release', 1.0)
 
 #sfz1.setForAll('Cutoff', 200)
-sfz1.setForAllIf('Cutoff', 2000, 'Vel', '==', 33)
-sfz1.setForAllIf('Cutoff', 1400, 'Vel', '==', 50)
-sfz1.setForAllIf('Cutoff', 800, 'Vel', '==', 75)
-sfz1.setForAllIf('Cutoff', 220, 'Vel', '==', 100)
-sfz1.setForAllIf('Cutoff', 160, 'Vel', '==', 116)
-sfz1.setForAllIf('Cutoff', 120, 'Vel', '==', 127)
+sfz1.setForAllIf('Cutoff', 2000, 'Vel', '==', v1)
+sfz1.setForAllIf('Cutoff', 1400, 'Vel', '==', v2)
+sfz1.setForAllIf('Cutoff', 600, 'Vel', '==', v3)
+sfz1.setForAllIf('Cutoff', 160, 'Vel', '==', v4)
+sfz1.setForAllIf('Cutoff', 120, 'Vel', '==', v5)
+sfz1.setForAllIf('Cutoff', 100, 'Vel', '==', v6)
 
-sfz1.setForAllIf('Volume', 1, 'Vel', '==', 33)
-sfz1.setForAllIf('Volume', 2, 'Vel', '==', 50)
-sfz1.setForAllIf('Volume', 5, 'Vel', '==', 75)
-sfz1.setForAllIf('Volume', 1, 'Vel', '==', 100)
-sfz1.setForAllIf('Volume', 0, 'Vel', '==', 116)
-sfz1.setForAllIf('Volume', -1, 'Vel', '==', 127)
+sfz1.setForAllIf('Volume', 1, 'Vel', '==', v1)
+sfz1.setForAllIf('Volume', 2, 'Vel', '==', v2)
+sfz1.setForAllIf('Volume', 5, 'Vel', '==', v3)
+sfz1.setForAllIf('Volume', 1, 'Vel', '==', v4)
+sfz1.setForAllIf('Volume', 0, 'Vel', '==', v5)
+sfz1.setForAllIf('Volume', -1, 'Vel', '==', v6)
 
-sfz1.setForAllIf('Amp_veltrack', 94, 'Vel', '==', 33)
-sfz1.setForAllIf('Amp_veltrack', 96, 'Vel', '==', 50)
+sfz1.setForAllIf('Amp_veltrack', 94, 'Vel', '==', v1)
+sfz1.setForAllIf('Amp_veltrack', 96, 'Vel', '==', v2)
 
 sfz1.setForAll('Fil_veltrack', 8000)
 

@@ -10,7 +10,7 @@ import os
 import music21 as mus
 import re
 
-folderPath = '/media/luiz/Volume/Dokumente/Musik/Projekte/SoundFonts/PTQ_SteinwayD_H/tmp'
+folderPath = '/media/luiz/Volume/Dokumente/Musik/Projekte/SoundFonts/PTQ_ConcertHarp/tmp'
 
 notes = []
 for iOctv in range(1,8):
@@ -19,8 +19,8 @@ for iOctv in range(1,8):
         note.octave = iOctv
         notes.append(note)
 
-notes.insert(0,mus.pitch.Pitch(midi=23))
-notes.insert(0,mus.pitch.Pitch(midi=21))
+notes.insert(0,mus.pitch.Pitch(midi=23)) # si natural grave
+#notes.insert(0,mus.pitch.Pitch(midi=21)) # lá natural grave piano
 
 iF = 0
 files = os.listdir(folderPath)
@@ -30,5 +30,5 @@ for fname in files:
     if fname.endswith('.wav'):
         nmidistr = str(notes[iF].midi)
         #print(nmidistr)
-        os.rename(os.path.join(folderPath, fname), os.path.join(folderPath, 'kp_v2_pitch' + nmidistr + '.wav'))
+        os.rename(os.path.join(folderPath, fname), os.path.join(folderPath, 'norm_pitch' + nmidistr + '_r2_v3.wav'))
         iF = iF + 1
