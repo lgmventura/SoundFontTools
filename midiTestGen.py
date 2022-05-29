@@ -34,7 +34,7 @@ time     = 1
 pause    = 2    # In beats
 #duration = 1    # In beats
 tempo    = 60   # In BPM
-vel   = 75  # 0-127, as per the MIDI standard
+vel   = 16  # 0-127, as per the MIDI standard
 
 #%% Generating midi file
 
@@ -57,13 +57,13 @@ from pydub import AudioSegment
 import numpy as np
 from os import path
 
-audioPath = r"/media/luiz/Volume/Dokumente/Musik/Projekte/stwb_major-scale_v33.wav"
+audioPath = r"/media/luiz/Volume/Dokumente/Musik/Projekte/stwdh_major-scale_v16.wav"
 outputPath = r"/media/luiz/Volume/Dokumente/Musik/Projekte/temp"
 
 audio = AudioSegment.from_wav(audioPath)
 durations_ms = np.array([])
 pause_ms = pause * 60/tempo * 1000
-pause_ms = pause_ms - 1 # fine tuning, not sure why it's needed
+pause_ms = pause_ms# - 1 # fine tuning, not sure why it's needed
 for i, pitch in enumerate(degrees):
     duration_ms = duration_decay(i) * 60/tempo * 1000
     durations_ms = np.append(durations_ms, duration_ms)
