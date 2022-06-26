@@ -10,16 +10,18 @@ import os
 import music21 as mus
 import re
 
-folderPath = '/media/luiz/Volume/Dokumente/Musik/Projekte/SoundFonts/PTQ_ConcertHarp/tmp'
+folderPath = '/media/luiz/Volume/Dokumente/Musik/Projekte/SoundFonts/University of Iowa/Percussion/Vibraphone/sus/temp'
 
 notes = []
-for iOctv in range(1,8):
-    for iNote in ['C', 'D', 'E', 'F', 'G', 'A', 'B']:
+#for iOctv in range(1,8):
+for iOctv in range(6,7):
+    #for iNote in ['C', 'D', 'E', 'F', 'G', 'A', 'B']:
+    for iNote in ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B']:
         note = mus.pitch.Pitch(iNote)
         note.octave = iOctv
         notes.append(note)
 
-notes.insert(0,mus.pitch.Pitch(midi=23)) # si natural grave
+#notes.insert(0,mus.pitch.Pitch(midi=23)) # si natural grave
 #notes.insert(0,mus.pitch.Pitch(midi=21)) # lá natural grave piano
 
 iF = 0
@@ -29,6 +31,6 @@ files.sort(key=lambda f: int(''.join(filter(str.isdigit, f)))) # IMPORTANT: all 
 for fname in files:
     if fname.endswith('.wav'):
         nmidistr = str(notes[iF].midi)
-        #print(nmidistr)
-        os.rename(os.path.join(folderPath, fname), os.path.join(folderPath, 'norm_pitch' + nmidistr + '_r2_v3.wav'))
+        print(nmidistr)
+        #os.rename(os.path.join(folderPath, fname), os.path.join(folderPath, 'sus_p' + nmidistr + '_v2.wav'))
         iF = iF + 1
