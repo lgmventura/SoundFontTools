@@ -9,7 +9,7 @@ import copy
 import music21 as mus # install this. With pip: pip install music21 / with anaconda: conda install -c iainsgillis music21
 import re # regexp
 from os import listdir
-from os.path import isfile, join, relpath, dirname
+from os.path import isfile, join, split, relpath, dirname
 import numpy as np
 
 class sample:
@@ -20,14 +20,22 @@ class sample:
     Hikey              = None
     Lovel              = None
     Hivel              = None
+    Ampeg_start        = None
+    Ampeg_attack       = None
     Ampeg_release      = None
     Amp_veltrack       = None
     Cutoff             = None
     Fil_veltrack       = None
     Volume             = None
+    Hirand             = None
+    Lorand             = None
+    Trigger            = None
     
     # non-opcodes:
     Vel                = None
+    
+    # grouping
+    Group              = None
     
     # methods:
     def get_pkeycenter(self):
@@ -48,6 +56,7 @@ class sfz_creator:
         self.OutFile = outFile
     
     def genSfz(self): # generates sfz file from property "samples" (list of samples)
+        self.SfzStrL = [] # clear list
         self.writeHeader()
         for sample in self.Samples:
             self.writeSampleBlock(sample)
@@ -70,6 +79,10 @@ class sfz_creator:
         if sample.Hivel != None:
             self.SfzStrL.append('hivel=' + str(sample.Hivel))
         
+        if sample.Ampeg_start != None:
+            self.SfzStrL.append('ampeg_start=' + str(sample.Ampeg_start))
+        if sample.Ampeg_attack != None:
+            self.SfzStrL.append('ampeg_attack=' + str(sample.Ampeg_attack))
         if sample.Ampeg_release != None:
             self.SfzStrL.append('ampeg_release=' + str(sample.Ampeg_release))
         if sample.Amp_veltrack != None:
@@ -80,6 +93,12 @@ class sfz_creator:
             self.SfzStrL.append('fil_veltrack=' + str(sample.Fil_veltrack))
         if sample.Volume != None:
             self.SfzStrL.append('volume=' + str(sample.Volume))
+        if sample.Hirand != None:
+            self.SfzStrL.append('hirand=' + str(sample.Hirand))
+        if sample.Lorand != None:
+            self.SfzStrL.append('lorand=' + str(sample.Lorand))
+        if sample.Trigger != None:
+            self.SfzStrL.append('trigger=' + str(sample.Trigger))
             
         self.SfzStrL.append('') # empty line
         
@@ -160,59 +179,62 @@ class sfz_creator:
                         print('More than one velocity match for: ' + samFile)
                     else:
                         sam.Vel = self.VelMap[vel[0]] # assign mapped note velocity to property
+                if key == 'group':
+                    sam.Group = value
                         
             self.Samples.append(sam)
             self.PkcList.append(p.midi)
         
-    def autoSpreadKeys(self, spreadDirection): # lower keys, closest keys, higher keys
+    def autoSpreadKeys(self, spreadDirection, group = None): # lower keys, closest keys, higher keys
         self.Samples.sort(key=sample.get_pkeycenter) # sorting samples according to pitch keycenter
         self.PkcList.sort() # pitch keycenter list
         for iSam in range(len(self.Samples)): # run through list
             currP = self.Samples[iSam].Pkeycenter # currP = current pitch
-            if spreadDirection == 'lower':
-                if self.PkcList.index(currP) == 0: # if it's the lowest pitch keycentre
-                    self.Samples[iSam].Lokey = 0
-                    self.Samples[iSam].Hikey = currP
-                else:
-                    self.Samples[iSam].Lokey = self.PkcList[self.PkcList.index(currP)-1] + 1 # find first occurrence and go back one position. Add 1 to start next region without superposition.
-                    self.Samples[iSam].Hikey = currP
-            elif spreadDirection == 'higher':
-                if self.PkcList[::-1].index(currP) == 0:
-                    self.Samples[iSam].Lokey = currP
-                    self.Samples[iSam].Hikey = 127
-                else:
-                    self.Samples[iSam].Lokey = currP
-                    self.Samples[iSam].Hikey = self.PkcList[::-1][self.PkcList[::-1].index(currP)-1] - 1 # find last occurrence and go back one position (reversed list). Subtract 1 to finish before starting next region, without superposition.
-            elif spreadDirection == 'closest':
-                raise NotImplementedError('To be implemented.')
+            if group == None or group == self.Samples[iSam].Group:
+                if spreadDirection == 'lower':
+                    if self.PkcList.index(currP) == 0: # if it's the lowest pitch keycentre
+                        self.Samples[iSam].Lokey = 0
+                        self.Samples[iSam].Hikey = currP
+                    else:
+                        self.Samples[iSam].Lokey = self.PkcList[self.PkcList.index(currP)-1] + 1 # find first occurrence and go back one position. Add 1 to start next region without superposition.
+                        self.Samples[iSam].Hikey = currP
+                elif spreadDirection == 'higher':
+                    if self.PkcList[::-1].index(currP) == 0:
+                        self.Samples[iSam].Lokey = currP
+                        self.Samples[iSam].Hikey = 127
+                    else:
+                        self.Samples[iSam].Lokey = currP
+                        self.Samples[iSam].Hikey = self.PkcList[::-1][self.PkcList[::-1].index(currP)-1] - 1 # find last occurrence and go back one position (reversed list). Subtract 1 to finish before starting next region, without superposition.
+                elif spreadDirection == 'closest':
+                    raise NotImplementedError('To be implemented.')
             
         
-    def autoSpreadVelocities(self, spreadDirection): # lower vel, closest vel, higher vel
+    def autoSpreadVelocities(self, spreadDirection, group = None): # lower vel, closest vel, higher vel
         self.Samples.sort(key=sample.get_vel)
         self.Samples.sort(key=sample.get_pkeycenter) # sorting samples according to pitch keycenter
         self.PkcList.sort() # pitch keycenter list
         pkc_array = np.array(self.PkcList)
-        for iSam in range(len(self.Samples)): # run through list
-            currSam = self.Samples[iSam]
-            currP = self.Samples[iSam].Pkeycenter # currP = current pitch
-            sameP = np.where(pkc_array == currP)
-            samples_same_p = np.array(self.Samples)[sameP]
-            vels = [x.Vel for x in samples_same_p]
-            vels.sort()
-            vels.insert(0, 0)
-           # samples_same_p.tolist.sort(key=sample.Vel)
-            currIdx = samples_same_p.tolist().index(currSam)
-            if spreadDirection == 'lower':
-                self.Samples[iSam].Lovel = vels[currIdx] + 1
-                self.Samples[iSam].Hivel = vels[currIdx+1]
-            elif spreadDirection == 'higher':
-                raise NotImplementedError('To be implemented.')
-            elif spreadDirection == 'closest':
-                raise NotImplementedError('To be implemented.')
+        for iSam, currSam in enumerate(self.Samples): # run through list
+            if group == None or group == currSam.Group:
+                currP = self.Samples[iSam].Pkeycenter # currP = current pitch
+                sameP = np.where(pkc_array == currP)
+                samples_same_p = np.array(self.Samples)[sameP]
+                vels = [x.Vel for x in samples_same_p]
+                vels.sort()
+                vels.insert(0, 0)
+               # samples_same_p.tolist.sort(key=sample.Vel)
+                currIdx = samples_same_p.tolist().index(currSam)
+                if spreadDirection == 'lower':
+                    self.Samples[iSam].Lovel = vels[currIdx] + 1
+                    self.Samples[iSam].Hivel = vels[currIdx+1]
+                elif spreadDirection == 'higher':
+                    raise NotImplementedError('To be implemented.')
+                elif spreadDirection == 'closest':
+                    raise NotImplementedError('To be implemented.')
                 
         # todo - better approach: run thorough all pitches (0 to 127) and for every sub-region, do an independent spread. Connect them!
         
-    def setForAll(self, attribute: str, val):
+    def setForAll(self, attribute: str, val, group = None):
         """
         
 
@@ -229,9 +251,10 @@ class sfz_creator:
 
         """
         for iSam in range(len(self.Samples)):
-            setattr(self.Samples[iSam], attribute, val)
+            if group == None or group == self.Samples[iSam].Group:
+                setattr(self.Samples[iSam], attribute, val)
             
-    def setForAllIf(self, attribute: str, val, comparison_attr: str, comparison_sign: str, comparison_value):
+    def setForAllIf(self, attribute: str, val, comparison_attr: str, comparison_sign: str, comparison_value, group = None):
         """
         
 
@@ -263,28 +286,48 @@ class sfz_creator:
         # Todo: make it more flexible with any possible set of conditions. Like [if a < b and c != d or e == f] -> this will need an interpreter for this. eval, exec?
         if comparison_sign == '==':
             for iSam in range(len(self.Samples)):
-                if getattr(self.Samples[iSam], comparison_attr) == comparison_value:
-                    setattr(self.Samples[iSam], attribute, val)
+                if group == None or group == self.Samples[iSam].Group:
+                    if getattr(self.Samples[iSam], comparison_attr) == comparison_value:
+                        setattr(self.Samples[iSam], attribute, val)
         elif comparison_sign == '!=':
             for iSam in range(len(self.Samples)):
-                if getattr(self.Samples[iSam], comparison_attr) != comparison_value:
-                    setattr(self.Samples[iSam], attribute, val)
+                if group == None or group == self.Samples[iSam].Group:
+                    if getattr(self.Samples[iSam], comparison_attr) != comparison_value:
+                        setattr(self.Samples[iSam], attribute, val)
         elif comparison_sign == '>=':
             for iSam in range(len(self.Samples)):
-                if getattr(self.Samples[iSam], comparison_attr) >= comparison_value:
-                    setattr(self.Samples[iSam], attribute, val)
+                if group == None or group == self.Samples[iSam].Group:
+                    if getattr(self.Samples[iSam], comparison_attr) >= comparison_value:
+                        setattr(self.Samples[iSam], attribute, val)
         elif comparison_sign == '<=':
             for iSam in range(len(self.Samples)):
-                if getattr(self.Samples[iSam], comparison_attr) <= comparison_value:
-                    setattr(self.Samples[iSam], attribute, val)
+                if group == None or group == self.Samples[iSam].Group:
+                    if getattr(self.Samples[iSam], comparison_attr) <= comparison_value:
+                        setattr(self.Samples[iSam], attribute, val)
         elif comparison_sign == '>':
             for iSam in range(len(self.Samples)):
-                if getattr(self.Samples[iSam], comparison_attr) > comparison_value:
-                    setattr(self.Samples[iSam], attribute, val)
+                if group == None or group == self.Samples[iSam].Group:
+                    if getattr(self.Samples[iSam], comparison_attr) > comparison_value:
+                        setattr(self.Samples[iSam], attribute, val)
         elif comparison_sign == '<':
             for iSam in range(len(self.Samples)):
-                if getattr(self.Samples[iSam], comparison_attr) < comparison_value:
-                    setattr(self.Samples[iSam], attribute, val)
+                if group == None or group == self.Samples[iSam].Group:
+                    if getattr(self.Samples[iSam], comparison_attr) < comparison_value:
+                        setattr(self.Samples[iSam], attribute, val)
         else:
             raise AttributeError('Invalid comparison sign: ' + comparison_sign)
-        
+    
+    def setForAllRegexpFileName(self, attribute: str, val, re_template: str, group = None):
+        for idx, sample in enumerate(self.Samples):
+            match = re.findall(re_template, split(sample.Fname)[1]) # compare file name only, not path
+            if len(match) > 0:
+                if group == None or group == sample.Group:
+                    setattr(self.Samples[idx], attribute, val)
+    
+    def transpose(self, key_offset: int, group = None):
+        for idx, sample in enumerate(self.Samples):
+            if group == None or group == sample.Group:
+                sample.Pkeycenter = sample.Pkeycenter + key_offset
+                sample.Lokey = sample.Lokey + key_offset
+                sample.Hikey = sample.Hikey + key_offset
+                self.Samples[idx] = sample
