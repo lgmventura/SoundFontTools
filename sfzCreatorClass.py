@@ -33,6 +33,7 @@ class sample:
     
     # non-opcodes:
     Vel                = None
+    FullFilePath       = None
     
     # grouping
     Group              = None
@@ -42,6 +43,49 @@ class sample:
         return self.Pkeycenter
     def get_vel(self):
         return self.Vel
+
+# def peakAmpDB(wave_file_path):
+#     import wave
+#     import struct
+    
+#     # Open the audio file
+#     with wave.open(wave_file_path, 'r') as audio:
+#         # Extract the raw audio data
+#         raw_data = audio.readframes(audio.getnframes())
+    
+#     # Convert the raw audio data to a list of integers
+#     samples = struct.unpack('{n}h'.format(n=audio.getnframes()), raw_data)
+    
+#     # Find the peak sample
+#     peak = max(samples)
+    
+#     # Calculate the reference value based on the bit depth of the audio file
+#     reference_value = 2**(audio.getsampwidth() * 8 - 1)
+    
+#     # Calculate the peak value in dBFS, using the maximum possible sample value as the reference value
+#     peak_dB = 20 * np.log10(peak / reference_value)
+    
+#     print(peak_dB)
+
+# Defining some functions to be used later
+def getPeakAmpDB(wave_file_path):
+    from scipy.io.wavfile import read
+    
+    a = read(wave_file_path)
+    data = np.array(a[1])
+    maxAmp = np.max(data)/(2**16/2) # considering a signed 16 bit wav!! division by 2 because it's signed
+    minAmp = np.min(data)/(2**16/2)
+    
+    peakDB = max(20 * np.log10(maxAmp), 20 * np.log10(-minAmp))
+    
+    return peakDB
+
+def doBinaryOperation(val1, val2, binaryOp):
+    if binaryOp == '+':
+        retVal = val1 + val2
+    elif binaryOp == '*':
+        retVal = val1 * val2
+    return retVal
 
 class sfz_creator:
     Samples = None # list of dictionaries with sample name, file name and properties
@@ -141,6 +185,9 @@ class sfz_creator:
                 sam.Fname = join(folderPath, samFile)
             else:
                 sam.Fname = join(relpath(folderPath, dirname(self.OutFile)), samFile)
+            
+            sam.FullFilePath = join(folderPath, samFile)
+            
             # create a pitch object:
             p = mus.pitch.Pitch()
             
@@ -324,6 +371,45 @@ class sfz_creator:
                 if group == None or group == sample.Group:
                     setattr(self.Samples[idx], attribute, val)
     
+    def operateOnAll(self, attribute: str, val, binaryOp: str, group = None):
+        """
+        Operate on all samples. If a group is given, it will restrict to that
+        group. Usage:
+            sfz.operateOnAllOpcodes("Volume", 2, "+") will increase the volume
+            of all samples by 2.
+
+        Parameters
+        ----------
+        attribute : str
+            attribute to modified for all samples. E.g. 'Ampeg_release'
+        val : int OR float
+            value to operate with attribute in all samples.
+        binaryOp: str
+            Operator to use between current value of the attribute and val,
+            resulting in the new value for the attribute.
+
+        Returns
+        -------
+        None.
+
+        """
+        for iSam in range(len(self.Samples)):
+            if group == None or group == self.Samples[iSam].Group:
+                currVal = getattr(self.Samples[iSam], attribute)
+                newVal = doBinaryOperation(currVal, val, binaryOp)
+                setattr(self.Samples[iSam], attribute, newVal)
+    
+    # TODO: operateOnAllIf
+    
+    def operateOnAllRegexpFileName(self, attribute: str, val, binaryOp: str, re_template: str, group = None):
+        for idx, sample in enumerate(self.Samples):
+            match = re.findall(re_template, split(sample.Fname)[1]) # compare file name only, not path
+            if len(match) > 0:
+                if group == None or group == sample.Group:
+                    currVal = getattr(self.Samples[idx], attribute)
+                    newVal = doBinaryOperation(currVal, val, binaryOp)
+                    setattr(self.Samples[idx], attribute, newVal)
+    
     def transpose(self, key_offset: int, group = None):
         for idx, sample in enumerate(self.Samples):
             if group == None or group == sample.Group:
@@ -331,3 +417,11 @@ class sfz_creator:
                 sample.Lokey = sample.Lokey + key_offset
                 sample.Hikey = sample.Hikey + key_offset
                 self.Samples[idx] = sample
+
+    # Methods that access the wav files
+    def setVolumeToNormalize(self, multiplier: float = 1, group = None):
+        for idx, sample in enumerate(self.Samples):
+            if group == None or group == sample.Group:
+                peakDB = getPeakAmpDB(sample.FullFilePath)
+                self.Samples[idx].Volume = multiplier * (-peakDB)
+            
