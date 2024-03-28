@@ -38,9 +38,14 @@ sfz1.getSamplesFromFolder(fp, pmidi = 'pitch(\d+)', vel='-(v\d)', group=0)
 
 sfz1.autoSpreadKeys('higher')
 
+sfz1.autoSpreadVelocities('lower')
+
+sfz1.changeLoVelIfVels(newLovel=1, ifHivel=64, ifLovel=65)  # do the bugfix after autospreadVels because of multiple rr samples in the same region
+
+# this below works now, but then the region v2 will be problematic, starting from 1
 # sfz1.setGroupRegexpFileName('rr1', newGroup=1)
 # sfz1.setGroupRegexpFileName('rr2', newGroup=2)
-sfz1.autoSpreadVelocities('lower')
+
 # sfz1.autoSpreadVelocities('lower', group=0)
 # sfz1.autoSpreadVelocities('lower', group=1)
 # sfz1.autoSpreadVelocities('lower', group=2)
