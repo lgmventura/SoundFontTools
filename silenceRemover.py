@@ -12,7 +12,7 @@ Created on Sun May 29 23:47:57 2022
 from pydub import AudioSegment
 from os import path, listdir
 
-folderPath = r"/media/luiz/Volume/Dokumente/Musik/Projekte/SoundFonts/University of Iowa/Percussion/Vibraphone/sus"
+folderPath = r"/media/luiz/HDp1/Gravações/SF/Essenfelder_v2/pedal_off"
 outputFolder = r"processed" # folder must exist!
 
 def detect_leading_silence(sound, silence_threshold=-50.0, chunk_size=5):
@@ -70,6 +70,6 @@ samFiles = listdir(folderPath)
 for samFile in samFiles:
     if samFile[-4:] != '.wav':
         continue # skip non wave files
-    audioProcessed = removeLeadingSilence(path.join(folderPath, samFile), offset=-5, silence_threshold=-30, chunk_size=5)
+    audioProcessed = removeLeadingSilence(path.join(folderPath, samFile), offset=-20, silence_threshold=-40, chunk_size=5)
     outputFile = path.join(folderPath, outputFolder, samFile)
     audioProcessed.export(outputFile, format="wav")

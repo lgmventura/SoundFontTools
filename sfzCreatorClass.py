@@ -12,6 +12,8 @@ from os import listdir
 from os.path import isfile, join, split, relpath, dirname
 import numpy as np
 
+from audio_db import getPeakAmpDB
+
 class sample:
     # opcodes:
     Fname              = None
@@ -30,6 +32,7 @@ class sample:
     Hirand             = None
     Lorand             = None
     Trigger            = None
+    Offset             = None
     
     # non-opcodes:
     Vel                = None
@@ -66,19 +69,6 @@ class sample:
 #     peak_dB = 20 * np.log10(peak / reference_value)
     
 #     print(peak_dB)
-
-# Defining some functions to be used later
-def getPeakAmpDB(wave_file_path):
-    from scipy.io.wavfile import read
-    
-    a = read(wave_file_path)
-    data = np.array(a[1])
-    maxAmp = np.max(data)/(2**16/2) # considering a signed 16 bit wav!! division by 2 because it's signed
-    minAmp = np.min(data)/(2**16/2)
-    
-    peakDB = max(20 * np.log10(maxAmp), 20 * np.log10(-minAmp))
-    
-    return peakDB
 
 def doBinaryOperation(val1, val2, binaryOp):
     if binaryOp == '+':
@@ -143,6 +133,8 @@ class sfz_creator:
             self.SfzStrL.append('lorand=' + str(sample.Lorand))
         if sample.Trigger != None:
             self.SfzStrL.append('trigger=' + str(sample.Trigger))
+        if sample.Offset != None:
+            self.SfzStrL.append('offset=' + str(sample.Offset))
             
         self.SfzStrL.append('') # empty line
         
@@ -409,6 +401,18 @@ class sfz_creator:
                     currVal = getattr(self.Samples[idx], attribute)
                     newVal = doBinaryOperation(currVal, val, binaryOp)
                     setattr(self.Samples[idx], attribute, newVal)
+    
+    def setGroupRegexpFileName(self, re_template: str, newGroup: int, group = None):
+        for idx, sample in enumerate(self.Samples):
+            match = re.findall(re_template, split(sample.Fname)[1]) # compare file name only, not path
+            if len(match) > 0:
+                if group == None or group == sample.Group:
+                    self.Samples[idx].Group = newGroup
+    
+    def changeGroup(self, currentGroup: int, newGroup: int):
+        for idx, sample in enumerate(self.Samples):
+            if currentGroup == sample.Group:
+                self.Samples[idx].Group = newGroup
     
     def transpose(self, key_offset: int, group = None):
         for idx, sample in enumerate(self.Samples):
