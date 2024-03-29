@@ -16,27 +16,34 @@ from audio_db import getPeakAmpDB
 
 class sample:
     # opcodes:
-    Fname              = None
     Pkeycenter         = None
     Lokey              = None
     Hikey              = None
     Lovel              = None
     Hivel              = None
     Ampeg_start        = None
-    Ampeg_attack       = None
+    Ampeg_attack       = None  # https://sfzformat.com/opcodes/ampeg_attack/
     Ampeg_release      = None
+    Ampeg_hold         = None
+    Ampeg_sustain      = None
+    Ampeg_decay        = None
     Amp_veltrack       = None
     Cutoff             = None
     Fil_veltrack       = None
     Volume             = None
     Hirand             = None
     Lorand             = None
-    Trigger            = None
-    Offset             = None
+    Trigger            = None  # when to trigger the sample
+    Offset             = None  # number of samples to skip at the beginning (start to play at)
+    
+    Locc64             = None  # sustain pedal
+    Hicc64             = None  # sustain pedal
     
     # non-opcodes:
-    Vel                = None
+    Fname              = None
     FullFilePath       = None
+    
+    Vel                = None
     
     # grouping
     Group              = None
@@ -89,6 +96,13 @@ class sfz_creator:
         self.Samples = samples
         self.OutFile = outFile
     
+    def __add__(self, other):  # merging two sfz file objects
+        self.Samples = self.Samples + other.Samples
+        self.SfzStrL = self.SfzStrL + other.SfzStrL
+        self.VelMap = self.VelMap | other.VelMap
+        self.PkcList = self.PkcList + other.PkcList
+        return self
+    
     def genSfz(self): # generates sfz file from property "samples" (list of samples)
         self.SfzStrL = [] # clear list
         self.writeHeader()
@@ -119,6 +133,12 @@ class sfz_creator:
             self.SfzStrL.append('ampeg_attack=' + str(sample.Ampeg_attack))
         if sample.Ampeg_release != None:
             self.SfzStrL.append('ampeg_release=' + str(sample.Ampeg_release))
+        if sample.Ampeg_hold != None:
+            self.SfzStrL.append('ampeg_hold=' + str(sample.Ampeg_hold))
+        if sample.Ampeg_sustain != None:
+            self.SfzStrL.append('ampeg_sustain=' + str(sample.Ampeg_sustain))
+        if sample.Ampeg_decay != None:
+            self.SfzStrL.append('ampeg_decay=' + str(sample.Ampeg_decay))
         if sample.Amp_veltrack != None:
             self.SfzStrL.append('amp_veltrack=' + str(sample.Amp_veltrack))
         if sample.Cutoff != None:
@@ -135,6 +155,10 @@ class sfz_creator:
             self.SfzStrL.append('trigger=' + str(sample.Trigger))
         if sample.Offset != None:
             self.SfzStrL.append('offset=' + str(sample.Offset))
+        if sample.Locc64 != None:
+            self.SfzStrL.append('locc64=' + str(sample.Locc64))
+        if sample.Hicc64 != None:
+            self.SfzStrL.append('hicc64=' + str(sample.Hicc64))
             
         self.SfzStrL.append('') # empty line
         
@@ -247,48 +271,82 @@ class sfz_creator:
                 elif spreadDirection == 'closest':
                     raise NotImplementedError('To be implemented.')
             
-        
     def autoSpreadVelocities(self, spreadDirection, group = None): # lower vel, closest vel, higher vel
-        # because we want to do only for the group, let us separate the group
-        # first. If group is None, it will be the same as operating the whole
-        # list of samples.
-        sampleListGroup = []  # subset of samples of the given group
-        PkcListGroup = []  # subset of pitch keycentres of the given group
-        for idx, currSam in enumerate(self.Samples): # run through list
-            if group is None or group == currSam.Group:  # copy all samples from group to this subset
-                sampleListGroup.append(self.Samples[idx])
-                PkcListGroup.append(self.PkcList[idx])
+        self.Samples.sort(key=sample.get_vel)
+        self.Samples.sort(key=sample.get_pkeycenter) # sorting samples according to pitch keycenter
+        self.PkcList.sort() # pitch keycenter list
+        pkc_array = np.array(self.PkcList)
+        for iSam, currSam in enumerate(self.Samples): # run through list
+            if group == None or group == currSam.Group:
+                currP = self.Samples[iSam].Pkeycenter # currP = current pitch
+                sameP = np.where(pkc_array == currP)
+                samples_same_p = np.array(self.Samples)[sameP]
+                vels = [x.Vel for x in samples_same_p]
+                vels.sort()
+                vels.insert(0, 0)
+                # samples_same_p.tolist.sort(key=sample.Vel)
+                try:
+                    currIdx = samples_same_p.tolist().index(currSam)
+                except ValueError as e:
+                    print(f'Current sample keycentre: {currSam.Pkeycenter}')
+                    print(f'Same pitch at: {sameP}')
+                    print(f'Pitch keycentre array: {pkc_array}')
+                    print(f'length of pitch keycentre list: {len(self.PkcList)}')
+                    raise(e)
+                if spreadDirection == 'lower':
+                    self.Samples[iSam].Lovel = vels[currIdx] + 1
+                    self.Samples[iSam].Hivel = vels[currIdx+1]
+                elif spreadDirection == 'higher':
+                    raise NotImplementedError('To be implemented.')
+                elif spreadDirection == 'closest':
+                    raise NotImplementedError('To be implemented.')
+                    
         
-        sampleListGroup.sort(key=sample.get_vel)
-        sampleListGroup.sort(key=sample.get_pkeycenter) # sorting samples according to pitch keycenter
-        PkcListGroup.sort() # pitch keycenter list
-        pkc_array = np.array(PkcListGroup)
-        for idxG, currSamG in enumerate(sampleListGroup): # run through list
-             currP = sampleListGroup[idxG].Pkeycenter # currP = current pitch
-             sameP = np.where(pkc_array == currP)
-             samples_same_p = np.array(sampleListGroup)[sameP] # same pitch
-             vels = [x.Vel for x in samples_same_p]
-             vels.sort()
-             vels.insert(0, 0)
-            # samples_same_p.tolist.sort(key=sample.Vel)
-             currIdx = samples_same_p.tolist().index(currSamG)
-             if spreadDirection == 'lower':
-                 sampleListGroup[idxG].Lovel = vels[currIdx] + 1
-                 sampleListGroup[idxG].Hivel = vels[currIdx+1]
-             elif spreadDirection == 'higher':
-                 raise NotImplementedError('To be implemented.')
-             elif spreadDirection == 'closest':
-                 raise NotImplementedError('To be implemented.')
+    # TODO: correct this, which should do for the group separately:
+    # def autoSpreadVelocities(self, spreadDirection, group = None): # lower vel, closest vel, higher vel
+    #     self.Samples.sort(key=sample.get_pkeycenter) # sorting samples according to pitch keycenter
+    #     self.PkcList.sort() # pitch keycenter list    
+    #     # because we want to do only for the group, let us separate the group
+    #     # first. If group is None, it will be the same as operating the whole
+    #     # list of samples.
+    #     sampleListGroup = []  # subset of samples of the given group
+    #     PkcListGroup = []  # subset of pitch keycentres of the given group
+    #     for idx, currSam in enumerate(self.Samples): # run through list
+    #         if group is None or group == currSam.Group:  # copy all samples from group to this subset
+    #             sampleListGroup.append(self.Samples[idx])
+    #             PkcListGroup.append(self.PkcList[idx])
+        
+    #     sampleListGroup.sort(key=sample.get_vel)
+    #     sampleListGroup.sort(key=sample.get_pkeycenter) # sorting samples according to pitch keycenter
+    #     PkcListGroup.sort() # pitch keycenter list
+    #     pkc_array = np.array(PkcListGroup)
+    #     for idxG, currSamG in enumerate(sampleListGroup): # run through list
+    #          currP = sampleListGroup[idxG].Pkeycenter # currP = current pitch
+    #          sameP = np.where(pkc_array == currP)
+    #          samples_same_p = np.array(sampleListGroup)[sameP] # same pitch
+    #          vels = [x.Vel for x in samples_same_p]
+    #          vels.sort()
+    #          vels.insert(0, 0)
+    #         # samples_same_p.tolist.sort(key=sample.Vel)
+    #          currIdx = samples_same_p.tolist().index(currSamG)
+    #          if spreadDirection == 'lower':
+    #              sampleListGroup[idxG].Lovel = vels[currIdx] + 1
+    #              sampleListGroup[idxG].Hivel = vels[currIdx+1]
+    #          elif spreadDirection == 'higher':
+    #              raise NotImplementedError('To be implemented.')
+    #          elif spreadDirection == 'closest':
+    #              raise NotImplementedError('To be implemented.')
                 
-        # todo - better approach: run thorough all pitches (0 to 127) and for every sub-region, do an independent spread. Connect them!
+    #     # todo - better approach: run thorough all pitches (0 to 127) and for every sub-region, do an independent spread. Connect them!
         
-        # now going from the group list back to the global list self.Samples
-        for idx in range(len(self.Samples)-1, -1, -1):  # run it backwards because we will pop elements out
-            if self.Samples[idx].Group == group:
-                self.Samples.pop(idx) # delete all samples of this group
-                self.PkcList.pop(idx) # delete equally here
-        self.Samples = self.Samples + sampleListGroup  # insert them back, but now with velocities spreaded in the group
-        self.PkcList = self.PkcList + PkcListGroup  # insert back here too
+    #     # now going from the group list back to the global list self.Samples
+    #     for idx in range(len(self.Samples)-1, -1, -1):  # run it backwards because we will pop elements out
+    #         if self.Samples[idx].Group == group:
+    #             self.Samples.pop(idx) # delete all samples of this group
+    #             self.PkcList.pop(idx) # delete equally here
+    #     self.Samples = self.Samples + sampleListGroup  # insert them back, but now with velocities spreaded in the group
+    #     self.PkcList = self.PkcList + PkcListGroup  # insert back here too
+        
         
         
     def setForAll(self, attribute: str, val, group = None):

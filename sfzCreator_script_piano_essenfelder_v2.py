@@ -103,12 +103,19 @@ sfz1.getSamplesFromFolder(fp_internal_reverb, pmidi = 'pitch(\d+)', group=2)
 sfz1.autoSpreadKeys('higher', group=2)
 
 # set other opcodes for this group
-sfz1.setForAll('Volume', 8, group=2)
+sfz1.setForAll('Volume', 6, group=2)
+sfz1.setForAllRegexpFileName('Volume', 20, 'pitch(?:01|02|03|04)', group=2)
+sfz1.setForAllRegexpFileName('Volume', 16, 'pitch(?:05|06|07|08)', group=2)
+sfz1.setForAllRegexpFileName('Volume', 13, 'pitch(?:09|10|11)', group=2)
+sfz1.setForAllRegexpFileName('Volume', 9, 'pitch1[2-3]', group=2)
 sfz1.setForAll('Ampeg_release', 12.0, group=2)
+#sfz1.setForAll('Ampeg_decay', 2.0, group=2)
 sfz1.setForAll('Offset', 8000, group=2)
 sfz1.setForAll('Ampeg_attack', 0.6, group=2)
 
 sfz1.transpose(20, group=2)
+
+sfz1.setForAll('Hicc64', 63)  # all groups (should I only include group 0?)
 
 
 #sfz1.genSfz()
@@ -135,6 +142,8 @@ sfz2.setForAll('Ampeg_start', 40, group=1)
 sfz2.setForAll('Ampeg_attack', 0.3, group=1)
 sfz2.setForAll('Trigger', 'release', group=1)
 
+sfz2.setForAll('Hicc64', 63, group=1)
+
 # increase the volume to the lower key samples
 # sfz2.setForAllRegexpFileName('Volume', 2, 'pitch(?:01|02|03|04)', group=1)
 # sfz2.setForAllRegexpFileName('Volume', 1, 'pitch(?:05|06|07|08)', group=1)
@@ -154,6 +163,42 @@ sfz2.setForAllRegexpFileName('Hirand', 1.000, 'rr2', group=1)
 
 sfz2.transpose(20, group=1)
 
-sfz2.genSfz()
+#sfz2.genSfz()
 
-# TODO: finish
+
+# Pedal
+
+fp_pedal = '/media/luiz/HDp1/Gravações/SF/Essenfelder_v2/pedal_on'
+
+v1 = 64
+v2 = 80
+sfz3 = sfz_creator([], '/media/luiz/HDp1/Gravações/SF/Essenfelder_v2/Essenfelder_vertical_rel_v2.sfz')
+
+v1 = 90
+v2 = 127
+
+sfz3.VelMap = {'v1': v1 , 'v2': v2}
+
+sfz3.PkcList = []
+# import release samples and set them to group 3
+sfz3.getSamplesFromFolder(fp_pedal, pmidi = 'pitch(\d+)', vel='-(v\d)', group=3)
+
+# spread keys from group 1 (which contains the release samples)
+sfz3.autoSpreadKeys('higher', group=3)
+
+sfz3.autoSpreadVelocities('lower', group=3)
+
+# set other opcodes for this group
+sfz3.setForAll('Ampeg_release', 0.4, group=3)
+
+sfz3.setForAll('Locc64', 64, group=3)
+
+sfz3.setVolumeToNormalize(group=3)
+
+sfz3.transpose(20, group=3)
+
+# merging together
+sfz2 = sfz2 + sfz3
+
+# creating file
+sfz2.genSfz()
