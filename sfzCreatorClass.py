@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
+For SFZ v1. Not all opcodes implemented yet.
+
 Created on Tue Nov 17 23:33:36 2020
 
 @author: luiz
@@ -14,36 +16,42 @@ import numpy as np
 
 from audio_db import getPeakAmpDB
 
-class sample:
+from copy import deepcopy
+
+from dataclasses import dataclass, fields
+
+
+@dataclass
+class Sample:
     # opcodes:
-    Pkeycenter         = None
-    Lokey              = None
-    Hikey              = None
-    Lovel              = None
-    Hivel              = None
-    Ampeg_start        = None
-    Ampeg_attack       = None  # https://sfzformat.com/opcodes/ampeg_attack/
-    Ampeg_release      = None
-    Ampeg_hold         = None
-    Ampeg_sustain      = None
-    Ampeg_decay        = None
-    Amp_veltrack       = None
-    Cutoff             = None
-    Fil_veltrack       = None
-    Volume             = None
-    Hirand             = None
-    Lorand             = None
-    Trigger            = None  # when to trigger the sample
-    Offset             = None  # number of samples to skip at the beginning (start to play at)
+    Pkeycenter:      int = None
+    Lokey:           int = None
+    Hikey:           int = None
+    Lovel:           int = None
+    Hivel:           int = None
+    Ampeg_start:   float = None
+    Ampeg_attack:  float = None  # https://sfzformat.com/opcodes/ampeg_attack/
+    Ampeg_release: float = None
+    Ampeg_hold:    float = None
+    Ampeg_sustain: float = None
+    Ampeg_decay:   float = None
+    Amp_veltrack:  float = None
+    Cutoff:        float = None
+    Fil_veltrack:  float = None
+    Volume:        float = None
+    Hirand:        float = None
+    Lorand:        float = None
+    Trigger:       float = None  # when to trigger the sample
+    Offset:        float = None  # number of samples to skip at the beginning (start to play at)
     
-    Locc64             = None  # sustain pedal
-    Hicc64             = None  # sustain pedal
+    Locc64:        float = None  # sustain pedal
+    Hicc64:        float = None  # sustain pedal
     
     # non-opcodes:
-    Fname              = None
-    FullFilePath       = None
+    Fname:           str = None
+    FullFilePath:    str = None
     
-    Vel                = None
+    Vel:             int = None
     
     # grouping
     Group              = None
@@ -53,6 +61,19 @@ class sample:
         return self.Pkeycenter
     def get_vel(self):
         return self.Vel
+    
+    # def __repr__(self):
+    #     d = {f.name: getattr(self, f.name) for f in fields(self)}
+    #     return f"{self.__class__.__name__}({d})"
+
+def merge(a: Sample, b: Sample) -> Sample:
+    """First object wins when both are non-None."""
+    merged = Sample()
+    for f in fields(Sample):
+        name = f.name
+        val = getattr(a, name) if getattr(a, name) is not None else getattr(b, name)
+        setattr(merged, name, val)
+    return merged
 
 # def peakAmpDB(wave_file_path):
 #     import wave
@@ -84,7 +105,7 @@ def doBinaryOperation(val1, val2, binaryOp):
         retVal = val1 * val2
     return retVal
 
-class sfz_creator:
+class SfzCreator:
     Samples = None # list of dictionaries with sample name, file name and properties
     SfzStrL = [] # list of strings, one per line
     OutFile = None # output file path
@@ -111,7 +132,144 @@ class sfz_creator:
         with open(self.OutFile, 'w') as ofile:
             ofile.write('\n'.join(self.SfzStrL))
         print('SFZ file successfully generated')
+    
+    def clear(self):
+        self.Samples = [] # list of dictionaries with sample name, file name and properties
+        self.SfzStrL = [] # list of strings, one per line
+        self.OutFile = None # output file path
+        
+        self.VelMap  = None # dict mapping velocities
+        self.PkcList = []  # pitch keycentre list
+    
+    def loadSfzFile(self, sfz_file_path, append=False):
+        with open(sfz_file_path, 'r') as sfz_file:
+            sfz_str = sfz_file.read()
+        self.loadSfzFromString(sfz_str, append=append)
+        
+    def loadSfzFromString(self, sfz_str: str, append=False):
+        if not append:
+            self.clear()
+        
+        # groups here are the sfz groups, that define an opcode
+        # for many regions at the same time
+        groups = sfz_str.split('<group>')
+        group = Sample()
+        for idx_group, group_str in enumerate(groups):
+            regions = group_str.split('<region>')
+            for idx_region, region_str in enumerate(regions):
+                if len(re.findall('sample=', region_str)) > 0:  # it is a region (todo: check this)
+                    sample = deepcopy(group) #Sample()
+                    sample = self.search_opcodes(region_str, sample)
+                    # opcodes = self.search_opcodes(region_str)
+                    # sample = self.set_opcodes(opcodes, sample)
+                
+                    # merging fields from the group, when None (empty) in sample, but defined in group
+                    sample = merge(sample, group)
+                    self.Samples.append(sample)
+                else:  # it is a group
+                    group = Sample()  # define for the group
+                    group = self.search_opcodes(region_str, group)
+                    # opcodes = self.search_opcodes(region_str, group)
+                    # group = self.set_opcodes(opcodes, group)
+                
+                
+                
+        
+    def search_opcodes(self, string, sample=None):
+        if sample is None:
+            sample = Sample()
+        file = re.findall('sample=(.+)', string)
+        if len(file) > 0:
+            sample.FullFilePath = file[0]
+            sample.Fname = file[0].replace('\\', '/').split('/')[-1]
+        
+        pitch_keycentre = re.findall('pitch_keycenter=(\d+)', string)
+        if len(pitch_keycentre) > 0:
+            sample.Pkeycenter = int(pitch_keycentre[0])
+        
+        lokey = re.findall('lokey=(\d+)', string)
+        if len(lokey) > 0:
+            sample.Lokey = int(lokey[0])
             
+        hikey = re.findall('hikey=(\d+)', string)
+        if len(hikey) > 0:
+            sample.Hikey = int(hikey[0])
+            
+        lovel = re.findall('lovel=(\d+)', string)
+        if len(lovel) > 0:
+            sample.Lovel = int(lovel[0])
+            
+        hivel = re.findall('hivel=(\d+)', string)
+        if len(hivel) > 0:
+            sample.Hivel = int(hivel[0])
+        
+        ampeg_start = re.findall('ampeg_start=(\d+(?:.\d+)?)', string)
+        if len(ampeg_start) > 0:
+            sample.Ampeg_start = float(ampeg_start[0])
+        
+        ampeg_attack = re.findall('ampeg_attack=(\d+(?:.\d+)?)', string)
+        if len(ampeg_attack) > 0:
+            sample.Ampeg_attack = float(ampeg_attack[0])
+        
+        ampeg_release = re.findall('ampeg_release=(\d+(?:.\d+)?)', string)
+        if len(ampeg_release) > 0:
+            sample.Ampeg_release = float(ampeg_release[0])
+        
+        ampeg_hold = re.findall('ampeg_hold=(\d+(?:.\d+)?)', string)
+        if len(ampeg_hold) > 0:
+            sample.Ampeg_hold = float(ampeg_hold[0])
+        
+        ampeg_sustain = re.findall('ampeg_sustain=(\d+(?:.\d+)?)', string)
+        if len(ampeg_sustain) > 0:
+            sample.Ampeg_sustain = float(ampeg_sustain[0])
+        
+        ampeg_decay = re.findall('ampeg_decay=(\d+(?:.\d+)?)', string)
+        if len(ampeg_decay) > 0:
+            sample.Ampeg_decay = float(ampeg_decay[0])
+        
+        amp_veltrack = re.findall('amp_veltrack=(\d+(?:.\d+)?)', string)
+        if len(amp_veltrack) > 0:
+            sample.Amp_veltrack = float(amp_veltrack[0])
+        
+        cutoff = re.findall('cutoff=(\d+(?:.\d+)?)', string)
+        if len(cutoff) > 0:
+            sample.Cutoff = float(cutoff[0])
+        
+        fil_veltrack = re.findall('fil_veltrack=(\d+(?:.\d+)?)', string)
+        if len(fil_veltrack) > 0:
+            sample.Fil_veltrack = float(fil_veltrack[0])
+        
+        volume = re.findall('volume=(\d+(?:.\d+)?)', string)
+        if len(volume) > 0:
+            sample.Volume = float(volume[0])
+        
+        hirand = re.findall('hirand=(\d+(?:.\d+)?)', string)
+        if len(hirand) > 0:
+            sample.Hirand = float(hirand[0])
+        
+        lorand = re.findall('lorand=(\d+(?:.\d+)?)', string)
+        if len(lorand) > 0:
+            sample.Lorand = float(lorand[0])
+        
+        trigger = re.findall('trigger=(\d+(?:.\d+)?)', string)
+        if len(trigger) > 0:
+            sample.Trigger = float(trigger[0])
+        
+        offset = re.findall('offset=(\d+(?:.\d+)?)', string)
+        if len(offset) > 0:
+            sample.Offset = float(offset[0])
+        
+        locc64 = re.findall('locc64=(\d+(?:.\d+)?)', string)
+        if len(locc64) > 0:
+            sample.Locc64 = float(locc64[0])
+        
+        hicc64 = re.findall('hicc64=(\d+(?:.\d+)?)', string)
+        if len(hicc64) > 0:
+            sample.Hicc64 = float(hicc64[0])
+        
+        
+        return sample
+        
     def writeHeader(self):
         self.SfzStrL.append('// Header lines')
         self.SfzStrL.append('') # empty line
@@ -196,7 +354,7 @@ class sfz_creator:
         for samFile in samFiles:
             if samFile[-4:] != '.wav':
                 continue # skip non wave files
-            sam = sample()
+            sam = Sample()
             if self.OutFile == None:
                 sam.Fname = join(folderPath, samFile)
             else:
@@ -249,7 +407,7 @@ class sfz_creator:
             self.PkcList.append(p.midi)
         
     def autoSpreadKeys(self, spreadDirection, group = None): # lower keys, closest keys, higher keys
-        self.Samples.sort(key=sample.get_pkeycenter) # sorting samples according to pitch keycenter
+        self.Samples.sort(key=Sample.get_pkeycenter) # sorting samples according to pitch keycenter
         self.PkcList.sort() # pitch keycenter list
         for iSam in range(len(self.Samples)): # run through list
             currP = self.Samples[iSam].Pkeycenter # currP = current pitch
@@ -272,8 +430,8 @@ class sfz_creator:
                     raise NotImplementedError('To be implemented.')
             
     def autoSpreadVelocities(self, spreadDirection, group = None): # lower vel, closest vel, higher vel
-        self.Samples.sort(key=sample.get_vel)
-        self.Samples.sort(key=sample.get_pkeycenter) # sorting samples according to pitch keycenter
+        self.Samples.sort(key=Sample.get_vel)
+        self.Samples.sort(key=Sample.get_pkeycenter) # sorting samples according to pitch keycenter
         self.PkcList.sort() # pitch keycenter list
         pkc_array = np.array(self.PkcList)
         for iSam, currSam in enumerate(self.Samples): # run through list

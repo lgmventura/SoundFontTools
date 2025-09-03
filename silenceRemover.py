@@ -12,7 +12,7 @@ Created on Sun May 29 23:47:57 2022
 from pydub import AudioSegment
 from os import path, listdir
 
-folderPath = r"/media/luiz/HDp1/Gravações/SF/Essenfelder_v2/pedal_off"
+folderPath = r"/media/luiz/HDp1/Gravações/SF/Essenfelder_v2/pedal_on"
 outputFolder = r"processed" # folder must exist!
 
 def detect_leading_silence(sound, silence_threshold=-50.0, chunk_size=5):
