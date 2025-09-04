@@ -17,6 +17,8 @@ from lxml import etree
 from dataclasses import dataclass, fields
 import inspect
 
+import numpy as np
+
 
 musescore_version = '4.60'
 
@@ -109,16 +111,116 @@ class MusescoreDrumkit():
             root.append(child)
         
         return root
+    
+    def to_file(self, output_filepath: str,
+                incl_header=True,
+                append_extension=True):
+        if append_extension:
+            if not output_filepath.endswith('.drm'):
+                output_filepath = output_filepath + '.drm'
+        
+        root = self.to_lxml()
+        et = etree.ElementTree(root)
+        if incl_header:
+            header = '<?xml version="1.0" encoding="UTF-8"?>\n'
+            out_str = etree.tostring(root, pretty_print=True, encoding='unicode')
+            with open(output_filepath, 'w') as out_file:
+                out_file.write(header)
+                out_file.write(out_str)
+        else:
+            et.write(output_filepath, pretty_print=True)
 
-def sfz_class_to_drumkit_class():
-    pass
+def sfz_class_to_drumkit_class(sfz_creator_obj: SfzCreator,
+                               panelColumns: int = 8):
+    # shorter alias
+    sfz = sfz_creator_obj
+    
+    # get lists of lowkeys, hikeys and pitch keycentres
+    lokeys = np.array([sample.Lokey for sample in sfz.Samples])
+    hikeys = np.array([sample.Hikey for sample in sfz.Samples])
+    pitch_keycentres = np.array([sample.Pkeycenter for sample in sfz.Samples])
+    
+    # list of drums
+    drums = []
+    
+    # Getting filenames to identify common strings
+    fnames = [sample.Fname for sample in sfz.Samples]
+    
+    # identitying which strings are in all filenames
+    common_to_all = maximal_common_substrings(fnames)
+    
+    # removing common substrings
+    # fnames_diff = fnames[:]  # copy
+    fnames_diff = []
+    for fname in fnames:
+        for common_str in common_to_all:
+            fname = fname.replace(common_str, '')
+        fnames_diff.append(fname)
+    
+    
+    # going through all midi notes and extracting which
+    # ones have a sound in the SFZ
+    idx_drum = 0
+    for idx_midi_key in range(128):  # all 128 pitches, from 0 to 127
+        samples_current_key = []
+        
+        idx_match_lokeys = idx_midi_key >= lokeys
+        idx_match_hikeys = idx_midi_key <= hikeys
+        idx_match_both = np.where(np.logical_and(
+            idx_match_lokeys,
+            idx_match_hikeys))[0]
+        
+        samples_match_lokey = [sfz.Samples[idx] for idx in idx_match_lokeys]
+        samples_match_hikey = [sfz.Samples[idx] for idx in idx_match_hikeys]
+        
+        samples_match_both = [sfz.Samples[idx] for idx in idx_match_both]
+        
+        if len(samples_match_both) > 0:
+            drum = Drum()
+            
+            drum._pitch = idx_midi_key
+            
+            drum_fnames = [fnames_diff[idx] for idx in idx_match_both]
+            common_to_drum = maximal_common_substrings(drum_fnames)
+            
+            drum_name = ' '.join(common_to_drum).replace('_', ' ').strip()
+            drum.name = drum_name
+            
+            drum.head = 'normal'  # hard-coded for now
+            drum.line = 0  # hard-coded for now
+            
+            # this will be the horizontal position of the drum in the musescore Ui table selection
+            drum.panelColumn = idx_drum%panelColumns  # mod, rest of division, to get the column
+            
+            # this will be the vertical position of the drum in the musescore Ui table selection
+            drum.panelRow = idx_drum//panelColumns  # integer division to get the row
+            
+            drum.stem = 1  # hard-coded for now
+            drum.voice = 0  # hard-coded for now
+            
+            drums.append(drum)
+            
+            idx_drum = idx_drum + 1
+    
+    musescore_drumkit = MusescoreDrumkit()
+    musescore_drumkit.percussionPanelColumns = panelColumns
+    musescore_drumkit._Drums = drums
+    
+    return musescore_drumkit
 
-def sfz_to_musescore_drumkit_drm(sfz_fp: str, outfile: str = None):
-    sfz_class_to_drumkit_class()
+def sfz_to_musescore_drumkit_drm(sfz_fp: str, outfile: str = None, panelColumns=8):
+    if outfile is None:
+        outfile = sfz_fp.removesuffix('.sfz') + '.drm'
+    
+    sfz = SfzCreator()
+    sfz.loadSfzFile(sfz_fp)
+    drumkit = sfz_class_to_drumkit_class(sfz, panelColumns=panelColumns)
+    drumkit.to_file(outfile)
+    print(f'MuseScore Drumkit drm generated successfully, saved to {outfile}')
 
 
-if __name__ == '__main__':
-    # testing
+if __name__ == '__main__':  # tests - how to use
+    # drum class examples
     dr = Drum()
     dr2 = Drum()
     
@@ -131,3 +233,12 @@ if __name__ == '__main__':
     drm._Drums = [dr, dr2]
     root = drm.to_lxml()
     print(etree.tostring(root, pretty_print=True, encoding='unicode'))
+    
+    
+    # sfz class to drumkit class
+    sfz = SfzCreator()
+    sfz.loadSfzFile('my_sfz.sfz')
+    musescore_drumkit = sfz_class_to_drumkit_class(sfz)
+    
+    # direct file conversion
+    sfz_to_musescore_drumkit_drm('my_sfz.sfz', 'mu_drumkit.drm')

@@ -113,7 +113,7 @@ class SfzCreator:
     VelMap  = None # dict mapping velocities
     PkcList = []
     
-    def __init__(self, samples, outFile):
+    def __init__(self, samples=None, outFile=None):
         self.Samples = samples
         self.OutFile = outFile
     
