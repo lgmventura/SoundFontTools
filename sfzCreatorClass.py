@@ -49,11 +49,16 @@ class Sample:
     
     # non-opcodes:
     Fname:           str = None
-    FullFilePath:    str = None
+    GivenFilePath:   str = None  # might be absolute or relative
     
     Vel:             int = None
     
-    # grouping
+    # grouping: this is NOT the SFZ group concept, but a way
+    # of grouping samples together mapping them onto an
+    # integer to make easy to apply operations on all samples
+    # from a certain group at the same time
+    # (the SFZ group concept was implemented for import,
+    # but not for exporting yet)
     Group              = None
     
     # methods:
@@ -61,6 +66,7 @@ class Sample:
         return self.Pkeycenter
     def get_vel(self):
         return self.Vel
+    
     
     # def __repr__(self):
     #     d = {f.name: getattr(self, f.name) for f in fields(self)}
@@ -113,6 +119,8 @@ class SfzCreator:
     VelMap  = None # dict mapping velocities
     PkcList = []
     
+    RootDirectory = ''
+    
     def __init__(self, samples=None, outFile=None):
         self.Samples = samples
         self.OutFile = outFile
@@ -124,11 +132,11 @@ class SfzCreator:
         self.PkcList = self.PkcList + other.PkcList
         return self
     
-    def genSfz(self): # generates sfz file from property "samples" (list of samples)
+    def genSfz(self, include_givenpath_on_filenames=True): # generates sfz file from property "samples" (list of samples)
         self.SfzStrL = [] # clear list
         self.writeHeader()
         for sample in self.Samples:
-            self.writeSampleBlock(sample)
+            self.writeSampleBlock(sample, include_givenpath_on_filename=include_givenpath_on_filenames)
         with open(self.OutFile, 'w') as ofile:
             ofile.write('\n'.join(self.SfzStrL))
         print('SFZ file successfully generated')
@@ -145,6 +153,7 @@ class SfzCreator:
         with open(sfz_file_path, 'r') as sfz_file:
             sfz_str = sfz_file.read()
         self.loadSfzFromString(sfz_str, append=append)
+        self.RootDirectory, filename = split(sfz_file_path)
         
     def loadSfzFromString(self, sfz_str: str, append=False):
         if not append:
@@ -180,7 +189,7 @@ class SfzCreator:
             sample = Sample()
         file = re.findall('sample=(.+)', string)
         if len(file) > 0:
-            sample.FullFilePath = file[0]
+            sample.GivenFilePath = file[0]
             sample.Fname = file[0].replace('\\', '/').split('/')[-1]
         
         pitch_keycentre = re.findall('pitch_keycenter=(\d+)', string)
@@ -274,9 +283,13 @@ class SfzCreator:
         self.SfzStrL.append('// Header lines')
         self.SfzStrL.append('') # empty line
         
-    def writeSampleBlock(self, sample): # writes a region from a sample
+    def writeSampleBlock(self, sample, include_givenpath_on_filename=True): # writes a region from a sample
         self.SfzStrL.append('<region>')
-        self.SfzStrL.append('sample=' + sample.Fname)
+        if include_givenpath_on_filename:  # TODO: option to include rootdir + given path?
+            self.SfzStrL.append('sample=' + sample.GivenFilePath)
+        else:
+            self.SfzStrL.append('sample=' + sample.Fname)
+        
         self.SfzStrL.append('pitch_keycenter=' + str(sample.Pkeycenter))
         self.SfzStrL.append('lokey=' + str(sample.Lokey))
         self.SfzStrL.append('hikey=' + str(sample.Hikey))
@@ -360,7 +373,7 @@ class SfzCreator:
             else:
                 sam.Fname = join(relpath(folderPath, dirname(self.OutFile)), samFile)
             
-            sam.FullFilePath = join(folderPath, samFile)
+            sam.GivenFilePath = join(folderPath, samFile)
             
             # create a pitch object:
             p = mus.pitch.Pitch()
@@ -696,6 +709,7 @@ class SfzCreator:
     def setVolumeToNormalize(self, multiplier: float = 1, group = None):
         for idx, sample in enumerate(self.Samples):
             if group == None or group == sample.Group:
-                peakDB = getPeakAmpDB(sample.FullFilePath)
+                fullFilePath = join(self.RootDirectory, sample.GivenFilePath).replace('\\', '/')
+                peakDB = getPeakAmpDB(fullFilePath)
                 self.Samples[idx].Volume = multiplier * (-peakDB)
             
